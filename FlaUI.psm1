@@ -1,4 +1,6 @@
 using namespace FlaUI.Core
+using namespace FlaUI.Core.Tools
+using namespace System.Management.Automation
 
 function Get-UIA {
     [OutputType([FlaUI.Core.AutomationBase])]
@@ -22,4 +24,58 @@ function Get-ApplicationWindow {
         else { throw "Application main window not found" }
     }
     catch { if ($silent) { return $null } else { throw } }
+}
+
+function Find-Element {
+    [OutputType([FlaUI.Core.AutomationElements.AutomationElement])]
+    param (
+        [Alias("BaseElement")] [ValidateNotNullOrWhiteSpace()] [FlaUI.Core.AutomationElements.AutomationElement]$base,
+        [Alias("FindBy")] [ValidateSet("Id", "XPath", "Custom")] [string]$by,
+        [Alias("Element")] $value,
+        [Alias("OnErrorContinue")] [switch]$silent
+    )
+    try {
+        $element = switch ($by) {
+            "XPath" { $base.FindFirstByXPath($value) }
+            { $by -in @("Id", "Custom") } { $base.FindFirstDescendant($value) }
+            Default { throw [ValidationMetadataException] "Invalid find by type" }
+        }
+        if ($element) { return $element }
+        else { throw "Element $($by) '$($value)' not found" }
+    }
+    catch { if ($silent) { return $null } else { throw } }
+}
+
+function Wait-Element {
+    [OutputType([FlaUI.Core.AutomationElements.AutomationElement])]
+    param (
+        [Alias("BaseElement")] [ValidateNotNullOrWhiteSpace()] [FlaUI.Core.AutomationElements.AutomationElement]$base,
+        [Alias("WaitMethod")] [ValidateSet("Appear", "Disappear")] [string]$method,
+        [Alias("FindBy")] [ValidateSet("Id", "XPath", "Custom")] [string]$by,
+        [Alias("Element")] $value,
+        [Alias("TimeoutDuration")] [int]$timeout,
+        [Alias("WaitAfter")] [int]$sleep,
+        [Alias("OnErrorContinue")] [switch]$silent
+    )
+    try {
+        $msg = "Timeout after $($timeout) seconds, element $($by) '$($value)' not $($method.ToLower())"
+        $found = switch ($method) {
+            "Appear" {
+                [Retry]::WhileNull[FlaUI.Core.AutomationElements.AutomationElement]({
+                    $element = Find-Element $base $by $value
+                    if ($element.GetClickablePoint() -and $element.IsEnabled -and !$element.IsOffscreen) { return $element }
+                }, (New-TimeSpan -Seconds $timeout), (New-TimeSpan -Milliseconds 500), $true, $true, $msg).Result
+            }
+            "Disappear" {
+                [Retry]::WhileFalse({
+                    $element = Find-Element $base $by $value -OnErrorContinue
+                    return ($null -eq $element) -or $element.IsOffscreen
+                }, (New-TimeSpan -Seconds $timeout), (New-TimeSpan -Milliseconds 500), $true, $true, $msg).Result
+            }
+            Default { throw [ValidationMetadataException] "Invalid wait element method type" }
+        }
+        Start-Sleep -Seconds $sleep
+        return $found
+    }
+    catch { if ($silent) { return $method -eq "Disappear" ? $false : $null } else { throw } }
 }
