@@ -1,5 +1,8 @@
 using namespace FlaUI.Core
+using namespace FlaUI.Core.AutomationElements
+using namespace FlaUI.Core.Input
 using namespace FlaUI.Core.Tools
+using namespace FlaUI.Core.WindowsAPI
 using namespace System.Management.Automation
 
 function Get-UIA {
@@ -78,4 +81,51 @@ function Wait-Element {
         return $found
     }
     catch { if ($silent) { return $method -eq "Disappear" ? $false : $null } else { throw } }
+}
+
+function Invoke-Click {
+    [OutputType([bool])]
+    param (
+        [Alias("BaseElement")] [ValidateNotNullOrWhiteSpace()] [FlaUI.Core.AutomationElements.AutomationElement]$base,
+        [Alias("FindBy")] [ValidateSet("Id", "XPath", "Custom")] [string]$by,
+        [Alias("Element")] $value,
+        [Alias("Type")] [ValidateSet("Left", "LeftDouble", "Right", "RightDouble")] [string]$click,
+        [Alias("WaitAfter")] [int]$sleep,
+        [Alias("OnErrorContinue")] [switch]$silent
+    )
+    try {
+        $element = Find-Element $base $by $value
+        switch ($click) {
+            "Right" { $element.RightClick() }
+            "RightDouble" { $element.RightDoubleClick() }
+            "LeftDouble" { $element.DoubleClick() }
+            Default { $element.Click() }
+        }
+        Start-Sleep -Seconds $sleep
+        return $true
+    }
+    catch { if ($silent) { return $false } else { throw } }
+}
+
+function Set-Text {
+    [OutputType([bool])]
+    param (
+        [Alias("BaseElement")] [ValidateNotNullOrWhiteSpace()] [FlaUI.Core.AutomationElements.AutomationElement]$base,
+        [Alias("FindBy")] [ValidateSet("Id", "XPath", "Custom")] [string]$by,
+        [Alias("Element")] $value,
+        [Alias("TextInput")] [string]$text,
+        [Alias("WaitAfter")] [int]$sleep,
+        [Alias("EnterAfter")] [switch]$enter,
+        [Alias("OnErrorContinue")] [switch]$silent
+    )
+    try {
+        [AutomationElementExtensions]::AsTextBox((Find-Element $base $by $value)).Enter($text)
+        if ($enter) {
+            Start-Sleep -Seconds 1
+            [Keyboard]::Type([VirtualKeyShort]::ENTER)
+        }
+        Start-Sleep -Seconds $sleep
+        return $true
+    }
+    catch { if ($silent) { return $false } else { throw } }
 }
