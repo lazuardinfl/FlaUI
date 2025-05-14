@@ -1,5 +1,6 @@
 using namespace FlaUI.Core
 using namespace FlaUI.Core.AutomationElements
+using namespace FlaUI.Core.Definitions
 using namespace FlaUI.Core.Input
 using namespace FlaUI.Core.Tools
 using namespace FlaUI.Core.WindowsAPI
@@ -89,17 +90,23 @@ function Invoke-Click {
         [Alias("BaseElement")] [ValidateNotNullOrWhiteSpace()] [FlaUI.Core.AutomationElements.AutomationElement]$base,
         [Alias("FindBy")] [ValidateSet("Id", "XPath", "Custom")] [string]$by,
         [Alias("Element")] $value,
-        [Alias("Type")] [ValidateSet("Left", "LeftDouble", "Right", "RightDouble")] [string]$click,
+        [Alias("Type")] [ValidateSet("Left", "LeftDouble", "Right", "RightDouble", "Legacy", "Invoke", "Select", "ToggleOn", "ToggleOff")] [string]$click,
         [Alias("WaitAfter")] [int]$sleep,
         [Alias("OnErrorContinue")] [switch]$silent
     )
     try {
         $element = Find-Element $base $by $value
+        $patterns = $element.Patterns
         switch ($click) {
+            "Left" { $element.Click() }
+            "LeftDouble" { $element.DoubleClick() }
             "Right" { $element.RightClick() }
             "RightDouble" { $element.RightDoubleClick() }
-            "LeftDouble" { $element.DoubleClick() }
-            Default { $element.Click() }
+            "Invoke" { $patterns.Invoke.Pattern.Invoke() }
+            "Select" { $patterns.SelectionItem.Pattern.Select() }
+            "ToggleOn" { if ($patterns.Toggle.Pattern.ToggleState.Value -cne [ToggleState]::On) { $patterns.Toggle.Pattern.Toggle() } }
+            "ToggleOff" { if ($patterns.Toggle.Pattern.ToggleState.Value -cne [ToggleState]::Off) { $patterns.Toggle.Pattern.Toggle() } }
+            Default { $patterns.LegacyIAccessible.Pattern.DoDefaultAction() }
         }
         Start-Sleep -Seconds $sleep
         return $true
