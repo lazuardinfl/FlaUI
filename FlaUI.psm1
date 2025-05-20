@@ -136,3 +136,32 @@ function Set-Text {
     }
     catch { if ($silent) { return $false } else { throw } }
 }
+
+function Invoke-Scroll {
+    [OutputType([bool])]
+    param (
+        [Alias("BaseElement")] [ValidateNotNullOrWhiteSpace()] [FlaUI.Core.AutomationElements.AutomationElement]$base,
+        [Alias("FindElementBy")] [ValidateSet("Id", "XPath", "Custom")] [string]$elementBy,
+        [Alias("Element")] $elementValue,
+        [Alias("FindScrollBy")] [ValidateSet("Id", "XPath", "Custom")] [string]$scrollBy,
+        [Alias("Scroll")] $scrollValue,
+        [Alias("TimeoutDuration")] [int]$timeout,
+        [Alias("ScrollAgain")] [int]$scrollAfter,
+        [Alias("OnErrorContinue")] [switch]$silent
+    )
+    try {
+        $found = [Retry]::WhileFalse({
+            try {
+                $element = Find-Element $base $elementBy $elementValue
+                if ($element.GetClickablePoint() -and $element.IsEnabled -and !$element.IsOffscreen) { return $true }
+            }
+            catch [ValidationMetadataException] { throw }
+            catch {}
+            Invoke-Click $base $scrollBy $scrollValue Left | Out-Null
+            return $false
+        }, (New-TimeSpan -Seconds $timeout), (New-TimeSpan -Milliseconds 10), $true, $false, "Scroll failed to element $($elementBy) '$($elementValue)'").Result
+        if ($found) { for ($i = 0; $i -lt $scrollAfter; $i++) { Invoke-Click $base $scrollBy $scrollValue Left | Out-Null } }
+        return $found
+    }
+    catch { if ($silent) { return $false } else { throw } }
+}
