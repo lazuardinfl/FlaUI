@@ -11,12 +11,13 @@ switch ($env:FlaUIVersion) {
     }
 }
 try {
+    # register nuget repo
+    if (!(Get-PSResourceRepository | Where-Object { $_.Uri -eq $NuGetUrl })) {
+        Register-PSResourceRepository -Name NuGetGallery -Uri $NuGetUrl -Priority 80 -Trusted -Force -ErrorAction Stop
+    }
     # install
     foreach ($resource in $Resources) {
         if (!(Get-InstalledPSResource -Name $resource.Name -Version $resource.Version -ErrorAction SilentlyContinue)) {
-            if (!(Get-PSResourceRepository | Where-Object { $_.Uri -eq $NuGetUrl })) {
-                Register-PSResourceRepository -Name NuGetGallery -Uri $NuGetUrl -Priority 80 -Trusted -Force -ErrorAction Stop
-            }
             Install-PSResource $resource.Name -Version "[$($resource.Version)]" -Scope CurrentUser -TrustRepository -AcceptLicense -SkipDependencyCheck -ErrorAction Stop
         }
     }
